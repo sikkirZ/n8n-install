@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+- **Local TLS** - `scripts/setup_custom_tls.sh --generate-self-signed` builds a self-signed certificate (SANs from `.env` `*_HOSTNAME` and `USER_DOMAIN_NAME`, plus localhost). Arbitrary cert/key paths are accepted and copied into `./certs/` for Caddy. New `make setup-tls-self-signed` and `make setup-tls ARGS=...`.
+- **Install wizard TLS** - During `make install`, step 3 (`03_generate_secrets.sh`) prompts for HTTPS mode: Let's Encrypt, self-signed, or custom certificate files (`CADDY_TLS_MODE` in `.env`). `doctor` no longer warns about an empty `LETSENCRYPT_EMAIL` when TLS mode is not Let's Encrypt.
+
 ## [1.4.2] - 2026-03-28
 
 ### Fixed

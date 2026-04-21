@@ -6,7 +6,7 @@
 # 8 installation steps:
 #   1. System Preparation - updates packages, installs utilities, configures firewall
 #   2. Docker Installation - installs Docker and Docker Compose
-#   3. Secret Generation - creates .env file with secure passwords and secrets
+#   3. Secret Generation - creates .env, prompts for TLS mode (Let's Encrypt / self-signed / custom), generates secrets
 #   4. Service Wizard - interactive service selection using whiptail
 #   5. Service Configuration - prompts for API keys and service-specific settings
 #   6. Service Launch - starts all selected services via Docker Compose

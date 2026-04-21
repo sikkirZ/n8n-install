@@ -50,7 +50,11 @@ if [ -f "$ENV_FILE" ]; then
     if [ -n "$LETSENCRYPT_EMAIL" ]; then
         count_ok "LETSENCRYPT_EMAIL is set"
     else
-        count_warning "LETSENCRYPT_EMAIL is not set (SSL certificates may not work)"
+        if [ "${CADDY_TLS_MODE:-letsencrypt}" = "letsencrypt" ]; then
+            count_warning "LETSENCRYPT_EMAIL is not set (SSL certificates may not work)"
+        else
+            count_ok "LETSENCRYPT_EMAIL empty (expected for CADDY_TLS_MODE=${CADDY_TLS_MODE})"
+        fi
     fi
 
     if [ -n "$COMPOSE_PROFILES" ]; then

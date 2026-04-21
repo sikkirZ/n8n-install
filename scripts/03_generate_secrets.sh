@@ -10,7 +10,7 @@
 #   - Creates bcrypt hashes for Caddy basic auth using `caddy hash-password`
 #   - Preserves existing user-provided values in .env on re-run
 #   - Supports --update flag to add new variables without regenerating existing
-#   - Prompts for domain name and Let's Encrypt email
+#   - Prompts for domain name, TLS mode (Let's Encrypt / self-signed / custom files), and email
 #
 # Secret types: password (alphanum), secret (base64), hex, api_key, jwt
 #
@@ -205,10 +205,54 @@ else
     done
 fi
 
+# --- TLS / HTTPS mode (first-time or when CADDY_TLS_MODE missing in existing .env) ---
+log_subheader "HTTPS / TLS"
+INSTALL_TLS_MODE="${existing_env_vars[CADDY_TLS_MODE]:-}"
+CUSTOM_TLS_CERT=""
+CUSTOM_TLS_KEY=""
+TLS_CONFIGURE_THIS_RUN=0
+if [[ -n "$INSTALL_TLS_MODE" ]]; then
+    log_info "Using existing TLS mode from .env: $INSTALL_TLS_MODE"
+else
+    TLS_CONFIGURE_THIS_RUN=1
+    TLS_CHOICE_EXIT=0
+    INSTALL_TLS_MODE=$(wt_radiolist "HTTPS / TLS" \
+        "Choose how Caddy should obtain TLS certificates for your hostnames.\n\n• Let's Encrypt: public HTTPS, needs DNS pointing to this server and an email for ACME.\n• Self-signed: local or LAN; browsers show a warning unless you trust the cert.\n• My files: you provide paths to an existing certificate and private key." \
+        "letsencrypt" \
+        "letsencrypt" "Let's Encrypt (recommended for production on the Internet)" ON \
+        "self_signed" "Self-signed certificate (local / lab / private network)" OFF \
+        "custom" "My certificate files (corporate CA or existing PEM)" OFF) || TLS_CHOICE_EXIT=$?
+
+    if [[ "$TLS_CHOICE_EXIT" -ne 0 || -z "$INSTALL_TLS_MODE" ]]; then
+        INSTALL_TLS_MODE="letsencrypt"
+        log_info "TLS choice cancelled or empty; defaulting to Let's Encrypt."
+    fi
+    log_info "TLS mode selected: $INSTALL_TLS_MODE"
+
+    if [[ "$INSTALL_TLS_MODE" == "custom" ]]; then
+        while true; do
+            CUSTOM_TLS_CERT=$(wt_input "TLS certificate file" \
+                "Full path to your certificate (PEM/CRT), e.g. /etc/ssl/certs/fullchain.pem" "") || true
+            CUSTOM_TLS_KEY=$(wt_input "TLS private key file" \
+                "Full path to your private key, e.g. /etc/ssl/private/key.pem" "") || true
+            if [[ -f "$CUSTOM_TLS_CERT" && -f "$CUSTOM_TLS_KEY" ]]; then
+                break
+            fi
+            wt_msg "Files not found" "Certificate or key path is missing or not a regular file.\n\nCertificate: ${CUSTOM_TLS_CERT:-'(empty)'}\nKey: ${CUSTOM_TLS_KEY:-'(empty)'}"
+        done
+    fi
+fi
+
+generated_values["CADDY_TLS_MODE"]="$INSTALL_TLS_MODE"
+
 # Prompt for user email
 log_subheader "Email Configuration"
 if [[ -z "${existing_env_vars[LETSENCRYPT_EMAIL]}" ]]; then
-    wt_msg "Email Required" "Please enter your email address. It will be used for logins and Let's Encrypt SSL."
+    if [[ "$INSTALL_TLS_MODE" == "letsencrypt" ]]; then
+        wt_msg "Email" "Enter your email address. It is used for default service usernames and for Let's Encrypt (ACME registration)."
+    else
+        wt_msg "Email" "Enter your email address. It is used for default service usernames (Grafana, Welcome page, etc.).\n\nLet's Encrypt will not be used for this TLS mode; LETSENCRYPT_EMAIL will be left empty."
+    fi
 fi
 
 if [[ -n "${existing_env_vars[LETSENCRYPT_EMAIL]}" ]]; then
@@ -292,6 +336,10 @@ done
 for var in "${EMAIL_VARS[@]}"; do
     generated_values["$var"]="$USER_EMAIL"
 done
+# Do not register with Let's Encrypt when using self-signed or custom TLS files
+if [[ "$INSTALL_TLS_MODE" != "letsencrypt" ]]; then
+    generated_values["LETSENCRYPT_EMAIL"]=""
+fi
 
 # Database names for backward compatibility
 # New installations: use service-specific databases (postiz, waha, lightrag)
@@ -595,6 +643,35 @@ log_success ".env file generated successfully in the project root ($OUTPUT_FILE)
 
 # Save installation ID for telemetry correlation
 save_installation_id "$OUTPUT_FILE"
+
+# Ensure CADDY_TLS_MODE is stored (covers templates without this line yet)
+_update_or_add_env_var "CADDY_TLS_MODE" "$INSTALL_TLS_MODE"
+
+# Apply Caddy TLS only when the user chose TLS this run (avoids regenerating self-signed on secrets re-run)
+if [[ "$TLS_CONFIGURE_THIS_RUN" == 1 ]]; then
+    log_subheader "Applying TLS configuration"
+    case "$INSTALL_TLS_MODE" in
+        self_signed)
+            log_info "Generating self-signed certificate from .env hostnames..."
+            bash "$SCRIPT_DIR/setup_custom_tls.sh" --generate-self-signed --no-restart
+            ;;
+        custom)
+            if [[ -f "${CUSTOM_TLS_CERT:-}" && -f "${CUSTOM_TLS_KEY:-}" ]]; then
+                log_info "Installing custom TLS certificate from provided paths..."
+                bash "$SCRIPT_DIR/setup_custom_tls.sh" "$CUSTOM_TLS_CERT" "$CUSTOM_TLS_KEY" --no-restart
+            else
+                log_info "TLS mode is custom (paths were not collected this run). Ensure files are in ./certs/ and run: make setup-tls"
+            fi
+            ;;
+        letsencrypt)
+            log_info "Using Let's Encrypt; resetting TLS snippet to automatic certificates if needed..."
+            bash "$SCRIPT_DIR/setup_custom_tls.sh" --remove --no-restart 2>/dev/null || true
+            ;;
+        *)
+            log_warning "Unknown CADDY_TLS_MODE '$INSTALL_TLS_MODE'; skipping TLS snippet update."
+            ;;
+    esac
+fi
 
 # Uninstall caddy
 apt remove -y caddy

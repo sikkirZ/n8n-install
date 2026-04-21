@@ -1,4 +1,4 @@
-.PHONY: help install update update-preview git-pull clean clean-all logs status monitor restart stop start show-restarts doctor switch-beta switch-stable import setup-tls
+.PHONY: help install update update-preview git-pull clean clean-all logs status monitor restart stop start show-restarts doctor switch-beta switch-stable import setup-tls setup-tls-self-signed
 
 PROJECT_NAME := localai
 
@@ -23,7 +23,8 @@ help:
 	@echo "  make doctor            Run system diagnostics"
 	@echo "  make import            Import n8n workflows from backup"
 	@echo "  make import n=10       Import first N workflows only"
-	@echo "  make setup-tls         Configure custom TLS certificates"
+	@echo "  make setup-tls         Configure custom TLS (optional ARGS=... for script flags)"
+	@echo "  make setup-tls-self-signed  Generate self-signed TLS from .env hostnames + localhost"
 	@echo ""
 	@echo "  make switch-beta       Switch to beta (develop branch)"
 	@echo "  make switch-stable     Switch to stable (main branch)"
@@ -99,4 +100,7 @@ else
 endif
 
 setup-tls:
-	bash ./scripts/setup_custom_tls.sh
+	bash ./scripts/setup_custom_tls.sh $(ARGS)
+
+setup-tls-self-signed:
+	bash ./scripts/setup_custom_tls.sh --generate-self-signed $(ARGS)

@@ -6,7 +6,7 @@ Files matching `site-*.conf` in this directory are automatically imported via `i
 
 ## Use Cases
 
-- Custom TLS certificates (corporate/internal CA)
+- Custom TLS certificates (corporate/internal CA, local self-signed, or paths outside `certs/`)
 - Additional reverse proxy rules
 - Custom headers or middleware
 - Rate limiting or access control
@@ -32,15 +32,31 @@ import /etc/caddy/addons/tls-snippet.conf
 
 By default, the snippet is empty (Let's Encrypt is used). When you run `make setup-tls`, the snippet is updated with your certificate paths.
 
-### Quick Setup
+### Local / self-signed HTTPS
 
-1. Place your certificates in the `certs/` directory:
+For offline or LAN installs, generate a certificate whose SANs include every `*_HOSTNAME` and `USER_DOMAIN_NAME` from `.env`, plus `localhost` and `127.0.0.1`:
+
+```bash
+make setup-tls-self-signed
+# optional: ARGS='--no-restart' or ARGS='--days 3650 --san "DNS:extra.lan,IP:10.0.0.5"'
+```
+
+Or: `bash scripts/setup_custom_tls.sh --generate-self-signed`. Point DNS or `/etc/hosts` at your machine for each hostname. Browsers will warn until you trust the CA (self-signed).
+
+### Quick Setup (existing certificates)
+
+1. Either copy files into `certs/`, or pass any filesystem path (they are copied into `certs/` for the container mount):
    ```bash
    cp /path/to/your/cert.crt ./certs/wildcard.crt
    cp /path/to/your/key.key ./certs/wildcard.key
    ```
 
-2. Run the setup script:
+   Or in one step:
+   ```bash
+   bash scripts/setup_custom_tls.sh /path/to/fullchain.pem /path/to/privkey.pem
+   ```
+
+2. Run the setup script (interactive picker if you omit paths):
    ```bash
    make setup-tls
    ```
@@ -54,7 +70,7 @@ By default, the snippet is empty (Let's Encrypt is used). When you run `make set
 To switch back to automatic Let's Encrypt certificates:
 
 ```bash
-make setup-tls --remove
+make setup-tls ARGS=--remove
 ```
 
 Or run directly:

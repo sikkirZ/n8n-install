@@ -41,7 +41,7 @@ This is **n8n-install**, a Docker Compose-based installer that provides a compre
 - `scripts/download_top_workflows.sh`: Downloads community n8n workflows
 - `scripts/import_workflows.sh`: Imports workflows from `n8n/backup/workflows/` into n8n (used by `make import`)
 - `scripts/restart.sh`: Restarts services with proper compose file handling (used by `make restart`)
-- `scripts/setup_custom_tls.sh`: Configures custom TLS certificates (used by `make setup-tls`); supports `--remove` to revert to Let's Encrypt
+- `scripts/setup_custom_tls.sh`: Custom TLS for Caddy (`make setup-tls`, `make setup-tls-self-signed`); `--generate-self-signed`, external cert paths (copied into `certs/`), `--remove` for Let's Encrypt
 - `start_services.py`: Python orchestrator for service startup order, builds Docker images, handles external services (Supabase/Dify cloning, env preparation, startup), generates SearXNG secret key, stops existing containers. Uses `python-dotenv` (`dotenv_values`).
 
 **Project Name**: All docker-compose commands use `-p localai` (defined in Makefile as `PROJECT_NAME := localai`).
@@ -88,7 +88,8 @@ make show-restarts     # Show restart count per container
 make doctor            # Run system diagnostics (DNS, SSL, containers, disk, memory)
 make import            # Import n8n workflows from backup
 make import n=10       # Import first N workflows only
-make setup-tls         # Configure custom TLS certificates
+make setup-tls         # Custom TLS (`ARGS='--flags'` forwarded to script)
+make setup-tls-self-signed  # Self-signed cert from .env *_HOSTNAME (+ localhost)
 
 make switch-beta       # Switch to develop branch and update
 make switch-stable     # Switch to main branch and update

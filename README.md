@@ -336,7 +336,8 @@ The project includes a Makefile for simplified command execution:
 | Command          | Description                                                        |
 | ---------------- | ------------------------------------------------------------------ |
 | `make doctor`    | Run system diagnostics (checks DNS, SSL, containers, disk, memory) |
-| `make setup-tls` | Configure custom TLS certificates for corporate/internal use       |
+| `make setup-tls` | Configure custom TLS (paths or `certs/`); `ARGS='...'` passed to the script |
+| `make setup-tls-self-signed` | Generate self-signed TLS from `.env` hostnames (`ARGS` optional)        |
 
 Run `make help` for the full list of available commands.
 
