@@ -17,10 +17,16 @@ For corporate/internal deployments where Let's Encrypt is not available, you can
 
 ### How It Works
 
-The main `Caddyfile` imports a TLS snippet that all service blocks use:
+The main `Caddyfile` imports a TLS snippet that all service blocks use, and a small global fragment for automatic HTTPS behaviour:
 
 ```caddy
-# In Caddyfile (top)
+# In Caddyfile (global options)
+{
+    email {$LETSENCRYPT_EMAIL:devnull@example.invalid}
+    import /etc/caddy/addons/global-auto-https.conf
+}
+
+# After the global block
 import /etc/caddy/addons/tls-snippet.conf
 
 # In each service block
@@ -29,6 +35,8 @@ import /etc/caddy/addons/tls-snippet.conf
     reverse_proxy n8n:5678
 }
 ```
+
+For **custom or self-signed** PEM files, `setup_custom_tls.sh` writes `auto_https disable_certs` into `global-auto-https.conf` so Caddy does not try Let’s Encrypt when a hostname is missing from the certificate SAN (see [caddy#7494](https://github.com/caddyserver/caddy/issues/7494)). For Let’s Encrypt mode, that file contains only comments so ACME stays enabled.
 
 By default, the snippet is empty (Let's Encrypt is used). When you run `make setup-tls`, the snippet is updated with your certificate paths.
 
@@ -86,6 +94,8 @@ caddy-addon/
 ├── README.md                   # This file
 ├── tls-snippet.conf.example    # Template for TLS snippet (tracked in git)
 ├── tls-snippet.conf            # Your TLS config (gitignored, auto-created)
+├── global-auto-https.conf.example  # Template for global auto_https tweak (tracked)
+├── global-auto-https.conf      # Filled by setup script (gitignored, auto-created)
 └── site-*.conf                 # Your custom addons (gitignored, must start with "site-")
 
 certs/

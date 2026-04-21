@@ -1,0 +1,4 @@
+# Imported inside the global { } block in the main Caddyfile.
+# Overwritten by scripts/setup_custom_tls.sh:
+#   - Let's Encrypt: comments only (automatic HTTPS / ACME enabled)
+#   - Custom or self-signed PEM: contains "auto_https disable_certs" so Caddy does not fall back to ACME when a hostname is missing from the certificate SAN (Caddy 2.10+).

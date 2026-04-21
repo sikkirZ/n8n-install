@@ -49,6 +49,13 @@ if [[ ! -f "$TLS_SNIPPET" ]] && [[ -f "$TLS_TEMPLATE" ]]; then
     log_info "Created tls-snippet.conf from template (Let's Encrypt mode)"
 fi
 
+GLOBAL_AUTO_HTTPS="$PROJECT_ROOT/caddy-addon/global-auto-https.conf"
+GLOBAL_AUTO_HTTPS_TEMPLATE="$PROJECT_ROOT/caddy-addon/global-auto-https.conf.example"
+if [[ ! -f "$GLOBAL_AUTO_HTTPS" ]] && [[ -f "$GLOBAL_AUTO_HTTPS_TEMPLATE" ]]; then
+    cp "$GLOBAL_AUTO_HTTPS_TEMPLATE" "$GLOBAL_AUTO_HTTPS"
+    log_info "Created global-auto-https.conf from template (required by Caddyfile)"
+fi
+
 # Check if Docker daemon is running
 if ! docker info > /dev/null 2>&1; then
   log_error "Docker daemon is not running. Please start Docker and try again."

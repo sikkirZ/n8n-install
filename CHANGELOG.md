@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Caddy + self-signed / custom PEM** - Caddy 2.10+ could try ACME when a site hostname was not listed in the certificate SAN. The stack now imports `global-auto-https.conf` with `auto_https disable_certs` whenever file-based TLS is active, expands self-signed SANs from every `{$*_HOSTNAME}` in the `Caddyfile`, uses a safe default for `email` when `LETSENCRYPT_EMAIL` is empty, and drops the invalid `internal` default in `docker-compose.yml`.
+
 ### Added
 - **Local TLS** - `scripts/setup_custom_tls.sh --generate-self-signed` builds a self-signed certificate (SANs from `.env` `*_HOSTNAME` and `USER_DOMAIN_NAME`, plus localhost). Arbitrary cert/key paths are accepted and copied into `./certs/` for Caddy. New `make setup-tls-self-signed` and `make setup-tls ARGS=...`.
 - **Install wizard TLS** - During `make install`, step 3 (`03_generate_secrets.sh`) prompts for HTTPS mode: Let's Encrypt, self-signed, or custom certificate files (`CADDY_TLS_MODE` in `.env`). `doctor` no longer warns about an empty `LETSENCRYPT_EMAIL` when TLS mode is not Let's Encrypt.

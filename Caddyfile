@@ -1,6 +1,9 @@
 {
     # Global options - works for both environments
-    email {$LETSENCRYPT_EMAIL}
+    # Default email avoids invalid "internal" when LETSENCRYPT_EMAIL is empty (file-based TLS).
+    email {$LETSENCRYPT_EMAIL:devnull@example.invalid}
+    # File-based TLS: auto_https snippet disables ACME (Caddy otherwise obtains certs if SAN mismatches).
+    import /etc/caddy/addons/global-auto-https.conf
 }
 
 # Import TLS snippet (must be before service blocks)

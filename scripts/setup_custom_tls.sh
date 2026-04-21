@@ -30,7 +30,10 @@ source "$(dirname "$0")/utils.sh" && init_paths
 
 SNIPPET_FILE="$PROJECT_ROOT/caddy-addon/tls-snippet.conf"
 SNIPPET_EXAMPLE="$PROJECT_ROOT/caddy-addon/tls-snippet.conf.example"
+GLOBAL_AUTO_HTTPS_FILE="$PROJECT_ROOT/caddy-addon/global-auto-https.conf"
+GLOBAL_AUTO_HTTPS_EXAMPLE="$PROJECT_ROOT/caddy-addon/global-auto-https.conf.example"
 CERTS_DIR="$PROJECT_ROOT/certs"
+CADDYFILE_PATH="$PROJECT_ROOT/Caddyfile"
 SELF_SIGNED_CERT_BASENAME="local-selfsigned.crt"
 SELF_SIGNED_KEY_BASENAME="local-selfsigned.key"
 
@@ -122,6 +125,31 @@ ensure_snippet_exists() {
             remove_config
         fi
     fi
+    ensure_global_auto_https_exists
+}
+
+ensure_global_auto_https_exists() {
+    if [[ ! -f "$GLOBAL_AUTO_HTTPS_FILE" ]] && [[ -f "$GLOBAL_AUTO_HTTPS_EXAMPLE" ]]; then
+        cp "$GLOBAL_AUTO_HTTPS_EXAMPLE" "$GLOBAL_AUTO_HTTPS_FILE"
+        log_info "Created global-auto-https.conf from template"
+    fi
+}
+
+# Caddy 2.10+: if a site uses tls cert.pem key.pem but the cert SAN does not match the site name,
+# Caddy may try ACME for that name. For a single PEM shared across all vhosts, disable cert automation globally.
+write_global_auto_https_file_tls() {
+    mkdir -p "$(dirname "$GLOBAL_AUTO_HTTPS_FILE")"
+    cat > "$GLOBAL_AUTO_HTTPS_FILE" << 'EOF'
+# File-based TLS (setup_custom_tls.sh): do not obtain certificates via ACME
+auto_https disable_certs
+EOF
+}
+
+write_global_auto_https_lets_encrypt() {
+    mkdir -p "$(dirname "$GLOBAL_AUTO_HTTPS_FILE")"
+    cat > "$GLOBAL_AUTO_HTTPS_FILE" << 'EOF'
+# Let's Encrypt / default automatic HTTPS (ACME enabled)
+EOF
 }
 
 generate_config() {
@@ -139,7 +167,8 @@ generate_config() {
 }
 EOF
 
-    log_success "Generated $SNIPPET_FILE"
+    write_global_auto_https_file_tls
+    log_success "Generated $SNIPPET_FILE and $GLOBAL_AUTO_HTTPS_FILE (auto_https disable_certs)"
 }
 
 remove_config() {
@@ -156,6 +185,7 @@ remove_config() {
 }
 EOF
 
+    write_global_auto_https_lets_encrypt
     log_success "Reset to Let's Encrypt (automatic certificates)"
 }
 
@@ -287,6 +317,22 @@ build_subject_alt_name() {
             [[ -n "$val" ]] || continue
             add_entry "DNS:${val}"
         done < <(grep -E '^[A-Za-z][A-Za-z0-9_]*_HOSTNAME=' "$ENV_FILE" 2>/dev/null || true)
+    fi
+
+    # Every {$VAR} site address in Caddyfile (must match certificate SAN or Caddy falls back to ACME)
+    if [[ -f "$CADDYFILE_PATH" ]] && [[ -f "$ENV_FILE" ]]; then
+        local vname vval
+        while IFS= read -r vname || [[ -n "$vname" ]]; do
+            [[ "$vname" =~ _HOSTNAME$ ]] || continue
+            vval="$(read_env_var "$vname" "$ENV_FILE" 2>/dev/null || true)"
+            vval="${vval//$'\r'/}"
+            vval="${vval#\"}"; vval="${vval%\"}"
+            vval="${vval#\'}"; vval="${vval%\'}"
+            vval="${vval#"${vval%%[![:space:]]*}"}"
+            vval="${vval%"${vval##*[![:space:]]}"}"
+            [[ -n "$vval" ]] || continue
+            add_entry "DNS:${vval}"
+        done < <(grep -oE '\{\$[A-Za-z0-9_]+\}' "$CADDYFILE_PATH" 2>/dev/null | sed 's/{\$\([^}]*\)}/\1/' | sort -u)
     fi
 
     if [[ -n "$EXTRA_SANS" ]]; then
