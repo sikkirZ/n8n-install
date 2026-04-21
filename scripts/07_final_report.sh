@@ -25,6 +25,7 @@ init_paths
 
 # Load environment variables from .env file
 load_env || exit 1
+PUBLIC_URL_SCHEME="${PUBLIC_URL_SCHEME:-https}"
 
 # Generate welcome page data
 if [ -f "$SCRIPT_DIR/generate_welcome_page.sh" ]; then
@@ -63,7 +64,7 @@ print_section "Welcome Page"
 echo ""
 echo -e "  ${WHITE}All your service credentials are available here:${NC}"
 echo ""
-print_credential "URL" "https://${WELCOME_HOSTNAME:-welcome.${USER_DOMAIN_NAME}}"
+print_credential "URL" "${PUBLIC_URL_SCHEME}://${WELCOME_HOSTNAME:-welcome.${USER_DOMAIN_NAME}}"
 print_credential "Username" "${WELCOME_USERNAME:-<not_set>}"
 print_credential "Password" "${WELCOME_PASSWORD:-<not_set>}"
 echo ""
@@ -74,7 +75,7 @@ echo -e "  ${DIM}hostnames, credentials, and internal URLs.${NC}"
 print_section "Next Steps"
 echo ""
 echo -e "  ${WHITE}1.${NC} Visit your Welcome Page to view all credentials"
-echo -e "     ${CYAN}https://${WELCOME_HOSTNAME:-welcome.${USER_DOMAIN_NAME}}${NC}"
+echo -e "     ${CYAN}${PUBLIC_URL_SCHEME}://${WELCOME_HOSTNAME:-welcome.${USER_DOMAIN_NAME}}${NC}"
 echo ""
 echo -e "  ${WHITE}2.${NC} Store the Welcome Page credentials securely"
 echo ""

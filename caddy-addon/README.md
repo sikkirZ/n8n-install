@@ -38,6 +38,10 @@ import /etc/caddy/addons/tls-snippet.conf
 
 For **custom or self-signed** PEM files, `setup_custom_tls.sh` writes `auto_https disable_certs` into `global-auto-https.conf` so Caddy does not try Let’s Encrypt when a hostname is missing from the certificate SAN (see [caddy#7494](https://github.com/caddyserver/caddy/issues/7494)). For Let’s Encrypt mode, that file contains only comments so ACME stays enabled.
 
+### HTTP-only mode (no TLS on Caddy)
+
+Set `CADDY_TLS_MODE=http`, `CADDY_HTTP_PREFIX=http://`, `PUBLIC_URL_SCHEME=http`, and `CADDY_TLS_LISTEN_SCHEME=http` in `.env` (the install wizard can pick **HTTP only**). Then run `bash scripts/setup_custom_tls.sh --http-only` (or it runs automatically on first install). Caddy serves `http://<hostname>` for each service; `welcome-routing.conf` contains a single HTTP welcome block. Use behind another reverse proxy or for local testing only.
+
 By default, the snippet is empty (Let's Encrypt is used). When you run `make setup-tls`, the snippet is updated with your certificate paths.
 
 ### Local / self-signed HTTPS

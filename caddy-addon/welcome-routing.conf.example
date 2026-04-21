@@ -1,0 +1,21 @@
+# Welcome Page (post-install dashboard). Copied to welcome-routing.conf when missing.
+# HTTP block for Cloudflare Tunnel access (prevents redirect loop when HTTPS is enabled)
+http://{$WELCOME_HOSTNAME} {
+    basic_auth {
+        {$WELCOME_USERNAME} {$WELCOME_PASSWORD_HASH}
+    }
+    root * /srv/welcome
+    file_server
+    try_files {path} /index.html
+}
+
+# HTTPS block for direct access (skipped in pure HTTP mode — see setup_custom_tls.sh --http-only)
+{$WELCOME_HOSTNAME} {
+    import service_tls
+    basic_auth {
+        {$WELCOME_USERNAME} {$WELCOME_PASSWORD_HASH}
+    }
+    root * /srv/welcome
+    file_server
+    try_files {path} /index.html
+}

@@ -1,4 +1,4 @@
-.PHONY: help install update update-preview git-pull clean clean-all logs status monitor restart stop start show-restarts doctor switch-beta switch-stable import setup-tls setup-tls-self-signed
+.PHONY: help install update update-preview git-pull clean clean-all logs status monitor restart stop start show-restarts doctor switch-beta switch-stable import setup-tls setup-tls-self-signed setup-http
 
 PROJECT_NAME := localai
 
@@ -25,6 +25,7 @@ help:
 	@echo "  make import n=10       Import first N workflows only"
 	@echo "  make setup-tls         Configure custom TLS (optional ARGS=... for script flags)"
 	@echo "  make setup-tls-self-signed  Generate self-signed TLS from .env hostnames + localhost"
+	@echo "  make setup-http          Plain HTTP for Caddy (set .env http vars first; ARGS optional)"
 	@echo ""
 	@echo "  make switch-beta       Switch to beta (develop branch)"
 	@echo "  make switch-stable     Switch to stable (main branch)"
@@ -104,3 +105,6 @@ setup-tls:
 
 setup-tls-self-signed:
 	bash ./scripts/setup_custom_tls.sh --generate-self-signed $(ARGS)
+
+setup-http:
+	bash ./scripts/setup_custom_tls.sh --http-only $(ARGS)

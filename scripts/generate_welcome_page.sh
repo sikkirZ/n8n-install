@@ -13,6 +13,8 @@ OUTPUT_FILE="$PROJECT_ROOT/welcome/data.json"
 # Load environment variables from .env file
 load_env || exit 1
 
+URL_PREFIX="${PUBLIC_URL_SCHEME:-https}://"
+
 # Ensure welcome directory exists
 mkdir -p "$PROJECT_ROOT/welcome"
 
@@ -146,7 +148,7 @@ if is_profile_active "dify"; then
         \"note\": \"Create account on first login\"
       },
       \"extra\": {
-        \"api_endpoint\": \"https://$(json_escape "$DIFY_HOSTNAME")/v1\",
+        \"api_endpoint\": \"${URL_PREFIX}$(json_escape "$DIFY_HOSTNAME")/v1\",
         \"internal_api\": \"http://dify-api:5001\"
       }
     }")
@@ -160,7 +162,7 @@ if is_profile_active "qdrant"; then
         \"api_key\": \"$(json_escape "$QDRANT_API_KEY")\"
       },
       \"extra\": {
-        \"dashboard\": \"https://$(json_escape "$QDRANT_HOSTNAME")/dashboard\",
+        \"dashboard\": \"${URL_PREFIX}$(json_escape "$QDRANT_HOSTNAME")/dashboard\",
         \"internal_api\": \"http://qdrant:6333\"
       }
     }")
@@ -226,8 +228,8 @@ if is_profile_active "ragapp"; then
         \"password\": \"$(json_escape "$RAGAPP_PASSWORD")\"
       },
       \"extra\": {
-        \"admin\": \"https://$(json_escape "$RAGAPP_HOSTNAME")/admin\",
-        \"docs\": \"https://$(json_escape "$RAGAPP_HOSTNAME")/docs\",
+        \"admin\": \"${URL_PREFIX}$(json_escape "$RAGAPP_HOSTNAME")/admin\",
+        \"docs\": \"${URL_PREFIX}$(json_escape "$RAGAPP_HOSTNAME")/docs\",
         \"internal_api\": \"http://ragapp:8000\"
       }
     }")
@@ -256,7 +258,7 @@ if is_profile_active "lightrag"; then
         \"api_key\": \"$(json_escape "$LIGHTRAG_API_KEY")\"
       },
       \"extra\": {
-        \"docs\": \"https://$(json_escape "$LIGHTRAG_HOSTNAME")/docs\",
+        \"docs\": \"${URL_PREFIX}$(json_escape "$LIGHTRAG_HOSTNAME")/docs\",
         \"internal_api\": \"http://lightrag:9621\"
       }
     }")
@@ -306,8 +308,8 @@ if is_profile_active "docling"; then
         \"password\": \"$(json_escape "$DOCLING_PASSWORD")\"
       },
       \"extra\": {
-        \"ui\": \"https://$(json_escape "$DOCLING_HOSTNAME")/ui\",
-        \"docs\": \"https://$(json_escape "$DOCLING_HOSTNAME")/docs\",
+        \"ui\": \"${URL_PREFIX}$(json_escape "$DOCLING_HOSTNAME")/ui\",
+        \"docs\": \"${URL_PREFIX}$(json_escape "$DOCLING_HOSTNAME")/docs\",
         \"internal_api\": \"http://docling:5001\"
       }
     }")
@@ -374,7 +376,7 @@ if is_profile_active "waha"; then
         \"api_key\": \"$(json_escape "$WAHA_API_KEY_PLAIN")\"
       },
       \"extra\": {
-        \"dashboard\": \"https://$(json_escape "$WAHA_HOSTNAME")/dashboard\",
+        \"dashboard\": \"${URL_PREFIX}$(json_escape "$WAHA_HOSTNAME")/dashboard\",
         \"swagger_user\": \"$(json_escape "$WHATSAPP_SWAGGER_USERNAME")\",
         \"swagger_pass\": \"$(json_escape "$WHATSAPP_SWAGGER_PASSWORD")\",
         \"internal_api\": \"http://waha:3000\"
@@ -587,7 +589,7 @@ $QUICK_START_JSON
 EOF
 
 log_success "Welcome page data generated at: $OUTPUT_FILE"
-log_info "Access it at: https://${WELCOME_HOSTNAME:-welcome.${USER_DOMAIN_NAME}}"
+log_info "Access it at: ${URL_PREFIX}${WELCOME_HOSTNAME:-welcome.${USER_DOMAIN_NAME}}"
 
 # Generate changelog.json with CHANGELOG.md content
 CHANGELOG_JSON_FILE="$PROJECT_ROOT/welcome/changelog.json"

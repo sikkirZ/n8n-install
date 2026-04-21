@@ -56,6 +56,13 @@ if [[ ! -f "$GLOBAL_AUTO_HTTPS" ]] && [[ -f "$GLOBAL_AUTO_HTTPS_TEMPLATE" ]]; th
     log_info "Created global-auto-https.conf from template (required by Caddyfile)"
 fi
 
+WELCOME_ROUTE="$PROJECT_ROOT/caddy-addon/welcome-routing.conf"
+WELCOME_ROUTE_TEMPLATE="$PROJECT_ROOT/caddy-addon/welcome-routing.conf.example"
+if [[ ! -f "$WELCOME_ROUTE" ]] && [[ -f "$WELCOME_ROUTE_TEMPLATE" ]]; then
+    cp "$WELCOME_ROUTE_TEMPLATE" "$WELCOME_ROUTE"
+    log_info "Created welcome-routing.conf from template (required by Caddyfile)"
+fi
+
 # Check if Docker daemon is running
 if ! docker info > /dev/null 2>&1; then
   log_error "Docker daemon is not running. Please start Docker and try again."

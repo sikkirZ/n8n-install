@@ -69,6 +69,10 @@ USER_INPUT_VARS=(
     "NEO4J_AUTH_USERNAME"
     "OPENAI_API_KEY"
     "RUN_N8N_IMPORT"
+    "CADDY_TLS_MODE"
+    "CADDY_HTTP_PREFIX"
+    "PUBLIC_URL_SCHEME"
+    "CADDY_TLS_LISTEN_SCHEME"
 )
 
 # Variables to generate: varName="type:length"
@@ -217,11 +221,12 @@ else
     TLS_CONFIGURE_THIS_RUN=1
     TLS_CHOICE_EXIT=0
     INSTALL_TLS_MODE=$(wt_radiolist "HTTPS / TLS" \
-        "Choose how Caddy should obtain TLS certificates for your hostnames.\n\n• Let's Encrypt: public HTTPS, needs DNS pointing to this server and an email for ACME.\n• Self-signed: local or LAN; browsers show a warning unless you trust the cert.\n• My files: you provide paths to an existing certificate and private key." \
+        "Choose how Caddy should serve traffic.\n\n• Let's Encrypt: HTTPS, DNS to this host, email for ACME.\n• Self-signed: HTTPS with a local PEM (browser warning).\n• My files: HTTPS with your PEM paths.\n• HTTP only: plain HTTP on port 80 (no TLS; for labs or behind a TLS terminator)." \
         "letsencrypt" \
         "letsencrypt" "Let's Encrypt (recommended for production on the Internet)" ON \
         "self_signed" "Self-signed certificate (local / lab / private network)" OFF \
-        "custom" "My certificate files (corporate CA or existing PEM)" OFF) || TLS_CHOICE_EXIT=$?
+        "custom" "My certificate files (corporate CA or existing PEM)" OFF \
+        "http" "HTTP only — no TLS on Caddy (port 80)" OFF) || TLS_CHOICE_EXIT=$?
 
     if [[ "$TLS_CHOICE_EXIT" -ne 0 || -z "$INSTALL_TLS_MODE" ]]; then
         INSTALL_TLS_MODE="letsencrypt"
@@ -244,6 +249,18 @@ else
 fi
 
 generated_values["CADDY_TLS_MODE"]="$INSTALL_TLS_MODE"
+
+if [[ "$TLS_CONFIGURE_THIS_RUN" == 1 ]]; then
+    if [[ "$INSTALL_TLS_MODE" == "http" ]]; then
+        generated_values["CADDY_HTTP_PREFIX"]="http://"
+        generated_values["PUBLIC_URL_SCHEME"]="http"
+        generated_values["CADDY_TLS_LISTEN_SCHEME"]="http"
+    else
+        generated_values["CADDY_HTTP_PREFIX"]=""
+        generated_values["PUBLIC_URL_SCHEME"]="https"
+        generated_values["CADDY_TLS_LISTEN_SCHEME"]="https"
+    fi
+fi
 
 # Prompt for user email
 log_subheader "Email Configuration"
@@ -666,6 +683,10 @@ if [[ "$TLS_CONFIGURE_THIS_RUN" == 1 ]]; then
         letsencrypt)
             log_info "Using Let's Encrypt; resetting TLS snippet to automatic certificates if needed..."
             bash "$SCRIPT_DIR/setup_custom_tls.sh" --remove --no-restart 2>/dev/null || true
+            ;;
+        http)
+            log_info "HTTP-only mode for Caddy (no TLS on proxied sites)..."
+            bash "$SCRIPT_DIR/setup_custom_tls.sh" --http-only --no-restart
             ;;
         *)
             log_warning "Unknown CADDY_TLS_MODE '$INSTALL_TLS_MODE'; skipping TLS snippet update."

@@ -3,7 +3,7 @@
 # setup_custom_tls.sh - Configure custom TLS certificates for Caddy
 # =============================================================================
 # Updates caddy-addon/tls-snippet.conf to use corporate/internal certificates
-# instead of Let's Encrypt, or generates a self-signed certificate for local use.
+# instead of Let's Encrypt, generates a self-signed certificate, or enables plain HTTP (--http-only).
 #
 # Usage:
 #   bash scripts/setup_custom_tls.sh                          # Interactive (files in ./certs/)
@@ -12,6 +12,7 @@
 #   bash scripts/setup_custom_tls.sh --generate-self-signed # SANs from .env *_HOSTNAME + localhost
 #   bash scripts/setup_custom_tls.sh --generate-self-signed --days 3650 --san "DNS:extra.local,IP:10.0.0.5"
 #   bash scripts/setup_custom_tls.sh --remove               # Reset to Let's Encrypt
+#   bash scripts/setup_custom_tls.sh --http-only           # Plain HTTP (CADDY_HTTP_PREFIX + auto_https off)
 #   bash scripts/setup_custom_tls.sh --remove -y            # Same, restart Caddy without prompt
 #
 # Flags:
@@ -32,6 +33,8 @@ SNIPPET_FILE="$PROJECT_ROOT/caddy-addon/tls-snippet.conf"
 SNIPPET_EXAMPLE="$PROJECT_ROOT/caddy-addon/tls-snippet.conf.example"
 GLOBAL_AUTO_HTTPS_FILE="$PROJECT_ROOT/caddy-addon/global-auto-https.conf"
 GLOBAL_AUTO_HTTPS_EXAMPLE="$PROJECT_ROOT/caddy-addon/global-auto-https.conf.example"
+WELCOME_ROUTING_FILE="$PROJECT_ROOT/caddy-addon/welcome-routing.conf"
+WELCOME_ROUTING_EXAMPLE="$PROJECT_ROOT/caddy-addon/welcome-routing.conf.example"
 CERTS_DIR="$PROJECT_ROOT/certs"
 CADDYFILE_PATH="$PROJECT_ROOT/Caddyfile"
 SELF_SIGNED_CERT_BASENAME="local-selfsigned.crt"
@@ -70,11 +73,12 @@ Options:
   -y, --yes               Restart Caddy without confirmation (when running)
   -n, --no-restart        Do not restart Caddy after configuration changes
   --remove                Reset to Let's Encrypt automatic certificates
+  --http-only             Plain HTTP for Caddy (empty tls snippet, auto_https off, welcome HTTP-only). Set CADDY_TLS_MODE=http and CADDY_HTTP_PREFIX=http:// in .env.
   --generate-self-signed  Create a self-signed certificate (SANs from .env + localhost)
   --days N                Validity period in days for self-signed (default: $SELF_SIGNED_DAYS)
   --san LIST              Extra subjectAltName entries (comma-separated)
 
-Arguments (optional, instead of --generate-self-signed / --remove):
+Arguments (optional, instead of --generate-self-signed / --remove / --http-only):
   CERT_FILE, KEY_FILE     Either basenames under ./certs/ or absolute/relative paths to files.
                           External paths are copied into ./certs/ for the Caddy bind mount.
 
@@ -86,6 +90,7 @@ Examples:
   $(basename "$0") --generate-self-signed --san "DNS:mybox.lan,IP:192.168.1.10"
   $(basename "$0") --remove
   $(basename "$0") --remove -y
+  $(basename "$0") --http-only --no-restart
 
 Local HTTPS:
   1. Set *_HOSTNAME in .env to hostnames you will use (e.g. n8n.local.test).
@@ -126,12 +131,27 @@ ensure_snippet_exists() {
         fi
     fi
     ensure_global_auto_https_exists
+    ensure_welcome_routing_exists
 }
 
 ensure_global_auto_https_exists() {
     if [[ ! -f "$GLOBAL_AUTO_HTTPS_FILE" ]] && [[ -f "$GLOBAL_AUTO_HTTPS_EXAMPLE" ]]; then
         cp "$GLOBAL_AUTO_HTTPS_EXAMPLE" "$GLOBAL_AUTO_HTTPS_FILE"
         log_info "Created global-auto-https.conf from template"
+    fi
+}
+
+copy_welcome_routing_from_example() {
+    if [[ -f "$WELCOME_ROUTING_EXAMPLE" ]]; then
+        cp "$WELCOME_ROUTING_EXAMPLE" "$WELCOME_ROUTING_FILE"
+        log_info "Restored welcome-routing.conf from template (HTTP + HTTPS welcome)"
+    fi
+}
+
+ensure_welcome_routing_exists() {
+    if [[ ! -f "$WELCOME_ROUTING_FILE" ]] && [[ -f "$WELCOME_ROUTING_EXAMPLE" ]]; then
+        cp "$WELCOME_ROUTING_EXAMPLE" "$WELCOME_ROUTING_FILE"
+        log_info "Created welcome-routing.conf from template"
     fi
 }
 
@@ -152,6 +172,45 @@ write_global_auto_https_lets_encrypt() {
 EOF
 }
 
+write_global_auto_https_http_only() {
+    mkdir -p "$(dirname "$GLOBAL_AUTO_HTTPS_FILE")"
+    cat > "$GLOBAL_AUTO_HTTPS_FILE" << 'EOF'
+# Plain HTTP mode (CADDY_TLS_MODE=http): no automatic TLS or HTTP→HTTPS redirects
+auto_https off
+EOF
+}
+
+write_welcome_routing_http_only() {
+    mkdir -p "$(dirname "$WELCOME_ROUTING_FILE")"
+    cat > "$WELCOME_ROUTING_FILE" << 'EOF'
+# HTTP-only stack: single welcome site (no duplicate http:// block)
+http://{$WELCOME_HOSTNAME} {
+    basic_auth {
+        {$WELCOME_USERNAME} {$WELCOME_PASSWORD_HASH}
+    }
+    root * /srv/welcome
+    file_server
+    try_files {path} /index.html
+}
+EOF
+}
+
+write_http_only_mode() {
+    cleanup_legacy_config
+    ensure_snippet_exists
+    ensure_welcome_routing_exists
+
+    cat > "$SNIPPET_FILE" << 'EOF'
+# TLS snippet empty — sites use http:// addresses (CADDY_HTTP_PREFIX in Caddyfile)
+(service_tls) {
+}
+EOF
+
+    write_global_auto_https_http_only
+    write_welcome_routing_http_only
+    log_success "Caddy configured for plain HTTP (tls snippet empty, auto_https off, welcome HTTP-only)"
+}
+
 generate_config() {
     local cert_file="$1"
     local key_file="$2"
@@ -168,6 +227,7 @@ generate_config() {
 EOF
 
     write_global_auto_https_file_tls
+    copy_welcome_routing_from_example
     log_success "Generated $SNIPPET_FILE and $GLOBAL_AUTO_HTTPS_FILE (auto_https disable_certs)"
 }
 
@@ -186,6 +246,7 @@ remove_config() {
 EOF
 
     write_global_auto_https_lets_encrypt
+    copy_welcome_routing_from_example
     log_success "Reset to Let's Encrypt (automatic certificates)"
 }
 
@@ -444,7 +505,7 @@ parse_options() {
                 EXTRA_SANS="$2"
                 shift 2
                 ;;
-            --remove|--generate-self-signed)
+            --remove|--generate-self-signed|--http-only)
                 break
                 ;;
             -*)
@@ -488,6 +549,28 @@ main() {
             done
             cleanup_legacy_config
             remove_config
+            maybe_restart_caddy
+            exit 0
+            ;;
+        --http-only)
+            shift
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    -y|--yes)
+                        AUTO_YES=1
+                        shift
+                        ;;
+                    -n|--no-restart)
+                        NO_RESTART=1
+                        shift
+                        ;;
+                    *)
+                        log_error "Unexpected argument after --http-only: $1"
+                        exit 1
+                        ;;
+                esac
+            done
+            write_http_only_mode
             maybe_restart_caddy
             exit 0
             ;;
