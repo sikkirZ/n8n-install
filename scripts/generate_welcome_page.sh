@@ -578,6 +578,7 @@ done
 cat > "$OUTPUT_FILE" << EOF
 {
   "domain": "$(json_escape "$USER_DOMAIN_NAME")",
+  "public_url_scheme": "$(json_escape "${PUBLIC_URL_SCHEME:-https}")",
   "generated_at": "$GENERATED_AT",
   "services": {
 $SERVICES_JSON

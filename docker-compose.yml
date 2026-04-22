@@ -101,6 +101,8 @@ x-n8n: &service-n8n
     N8N_SMTP_STARTTLS: ${N8N_SMTP_STARTTLS:-true}
     N8N_SMTP_USER: ${N8N_SMTP_USER:-}
     N8N_TRUST_PROXY: true
+    # Must be false when PUBLIC_URL_SCHEME=http (Secure cookies are not sent over plain HTTP → blank UI)
+    N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-true}
     N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_USER_MANAGEMENT_JWT_SECRET}
     NODE_ENV: production
     NODES_EXCLUDE: ${NODES_EXCLUDE:-[]}
@@ -690,6 +692,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_PROVISIONING_PATH: /etc/grafana/provisioning
+      GF_SERVER_ROOT_URL: ${GRAFANA_HOSTNAME:+${PUBLIC_URL_SCHEME:-https}://${GRAFANA_HOSTNAME}/}
+      GF_SECURITY_COOKIE_SECURE: ${GRAFANA_SECURITY_COOKIE_SECURE:-true}
     volumes:
       - grafana:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning

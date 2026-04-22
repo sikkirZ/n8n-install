@@ -255,10 +255,14 @@ if [[ "$TLS_CONFIGURE_THIS_RUN" == 1 ]]; then
         generated_values["CADDY_HTTP_PREFIX"]="http://"
         generated_values["PUBLIC_URL_SCHEME"]="http"
         generated_values["CADDY_TLS_LISTEN_SCHEME"]="http"
+        generated_values["N8N_SECURE_COOKIE"]="false"
+        generated_values["GRAFANA_SECURITY_COOKIE_SECURE"]="false"
     else
         generated_values["CADDY_HTTP_PREFIX"]=""
         generated_values["PUBLIC_URL_SCHEME"]="https"
         generated_values["CADDY_TLS_LISTEN_SCHEME"]="https"
+        generated_values["N8N_SECURE_COOKIE"]="true"
+        generated_values["GRAFANA_SECURITY_COOKIE_SECURE"]="true"
     fi
 fi
 
@@ -319,6 +323,7 @@ _update_or_add_env_var() {
         touch "$tmp_env_file" # Create empty temp if output file doesn't exist yet
     fi
 
+    # CADDY_HTTP_PREFIX must exist as empty string for HTTPS mode (Caddy site = hostname only → HTTPS)
     if [[ -n "$var_value" ]]; then
         # Use single quotes for values containing $ (like bcrypt hashes) to prevent variable expansion
         # Use double quotes for everything else
@@ -327,6 +332,8 @@ _update_or_add_env_var() {
         else
             echo "${var_name}=\"$var_value\"" >> "$tmp_env_file"
         fi
+    elif [[ "$var_name" == "CADDY_HTTP_PREFIX" ]]; then
+        echo "${var_name}=\"\"" >> "$tmp_env_file"
     fi
     mv "$tmp_env_file" "$OUTPUT_FILE"
     # trap - EXIT # Remove specific trap for this temp file if desired, or let main script's trap handle it.
@@ -655,6 +662,31 @@ for service in "${SERVICES_NEEDING_HASH[@]}"; do
 
     _update_or_add_env_var "$hash_var" "$existing_hash"
 done
+
+# n8n: Secure session cookies are not sent on plain HTTP — UI stays blank without this
+_public_scheme="${generated_values[PUBLIC_URL_SCHEME]:-}"
+if [[ -z "$_public_scheme" && -f "$OUTPUT_FILE" ]]; then
+    _line=$(grep -m1 '^PUBLIC_URL_SCHEME=' "$OUTPUT_FILE" 2>/dev/null || true)
+    if [[ -n "$_line" ]]; then
+        _public_scheme="${_line#PUBLIC_URL_SCHEME=}"
+        _public_scheme="${_public_scheme%\"}"
+        _public_scheme="${_public_scheme#\"}"
+        _public_scheme="${_public_scheme%\'}"
+        _public_scheme="${_public_scheme#\'}"
+    fi
+fi
+_public_scheme=${_public_scheme:-https}
+if [[ "$_public_scheme" == "http" ]]; then
+    _update_or_add_env_var "N8N_SECURE_COOKIE" "false"
+    _update_or_add_env_var "CADDY_HTTP_PREFIX" "http://"
+    _update_or_add_env_var "CADDY_TLS_LISTEN_SCHEME" "http"
+    _update_or_add_env_var "GRAFANA_SECURITY_COOKIE_SECURE" "false"
+else
+    _update_or_add_env_var "N8N_SECURE_COOKIE" "true"
+    _update_or_add_env_var "CADDY_HTTP_PREFIX" ""
+    _update_or_add_env_var "CADDY_TLS_LISTEN_SCHEME" "https"
+    _update_or_add_env_var "GRAFANA_SECURITY_COOKIE_SECURE" "true"
+fi
 
 log_success ".env file generated successfully in the project root ($OUTPUT_FILE)."
 
